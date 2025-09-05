@@ -1,5 +1,12 @@
 import nltk
-nltk.download('punkt', quiet=True)  # garante que o corpus está disponível
+import os
+
+# Força o download do punkt dentro do diretório temporário do Streamlit
+nltk_data_dir = os.path.join(os.getcwd(), "nltk_data")
+if not os.path.exists(nltk_data_dir):
+    os.makedirs(nltk_data_dir)
+nltk.data.path.append(nltk_data_dir)
+nltk.download('punkt', download_dir=nltk_data_dir, quiet=True)
 
 import streamlit as st
 from ufrgs_corretor import grade_ufrgs, detectar_erros
@@ -29,7 +36,7 @@ if st.button("Corrigir Redação"):
         st.write(f"**Expressão (até 50 pts):** {result['expressao_total_50']}")
         st.write(f"**Estrutura & Conteúdo (até 50 pts):** {result['estrutura_conteudo_total_50']}")
         st.write(f"**Total (0–100):** {result['total_100']}")
-        st.write(f"**Nota na escala UFRGS (0–25):** {result['total_escala_25']}")
+        st.write(f"**Nota na escala UFRGS (0–25):** {result['total_escala_25']}\n")
 
         st.subheader("🔍 Detalhamento dos critérios")
         st.write("**Expressão:**")
@@ -45,4 +52,3 @@ if st.button("Corrigir Redação"):
             st.write("Nenhum erro detectado!")
     else:
         st.warning("Por favor, cole uma redação para corrigir.")
-
