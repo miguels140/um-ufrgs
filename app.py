@@ -1,5 +1,5 @@
 import nltk
-nltk.download('punkt')  # Garante que o tokenizer do TextBlob esteja disponível
+nltk.download('punkt', quiet=True)  # garante que o corpus está disponível
 
 import streamlit as st
 from ufrgs_corretor import grade_ufrgs, detectar_erros
@@ -45,3 +45,4 @@ if st.button("Corrigir Redação"):
             st.write("Nenhum erro detectado!")
     else:
         st.warning("Por favor, cole uma redação para corrigir.")
+
