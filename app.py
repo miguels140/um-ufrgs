@@ -1,54 +1,93 @@
-import nltk
-import os
-
-# Força o download do punkt dentro do diretório temporário do Streamlit
-nltk_data_dir = os.path.join(os.getcwd(), "nltk_data")
-if not os.path.exists(nltk_data_dir):
-    os.makedirs(nltk_data_dir)
-nltk.data.path.append(nltk_data_dir)
-nltk.download('punkt', download_dir=nltk_data_dir, quiet=True)
-
 import streamlit as st
-from ufrgs_corretor import grade_ufrgs, detectar_erros
+from textblob import TextBlob
 
-st.set_page_config(page_title="Corretor de Redações UFRGS", layout="wide")
+st.title("Corretor de Redações UFRGS (Versão Gratuita)")
 
-st.title("📝 Corretor de Redações - UFRGS")
-st.write("Cole abaixo sua redação e as palavras-chave do tema para receber a avaliação e feedback de erros.")
+# Entrada do usuário
+tema = st.text_input("Informe o tema da redação:")
+texto = st.text_area("Cole sua redação aqui:")
 
-# Campo para palavras-chave do tema
-keywords = st.text_input(
-    "Palavras-chave do tema (separe por vírgulas):",
-    "inclusão digital, educação, desigualdade"
-)
+# Funções auxiliares
+def contar_linhas(texto):
+    linhas = [l for l in texto.strip().split("\n") if l.strip() != ""]
+    return len(linhas)
 
-# Campo para a redação
-essay = st.text_area("Digite sua redação aqui:", height=400)
+def extrair_palavras_chave(texto):
+    blob = TextBlob(texto)
+    keywords = [word.lower() for (word, tag) in blob.tags if tag.startswith('NN')]
+    return list(set(keywords))
 
-# Botão para corrigir a redação
-if st.button("Corrigir Redação"):
-    if essay.strip():
-        tema = [k.strip() for k in keywords.split(",") if k.strip()]
-        result = grade_ufrgs(essay, tema)
-        erros = detectar_erros(essay)
-
-        st.subheader("📊 Resultado da Correção")
-        st.write(f"**Expressão (até 50 pts):** {result['expressao_total_50']}")
-        st.write(f"**Estrutura & Conteúdo (até 50 pts):** {result['estrutura_conteudo_total_50']}")
-        st.write(f"**Total (0–100):** {result['total_100']}")
-        st.write(f"**Nota na escala UFRGS (0–25):** {result['total_escala_25']}\n")
-
-        st.subheader("🔍 Detalhamento dos critérios")
-        st.write("**Expressão:**")
-        st.json(result["detalhes_expressao"])
-        st.write("**Estrutura & Conteúdo:**")
-        st.json(result["detalhes_estrutura_conteudo"])
-
-        st.subheader("⚠️ Possíveis erros detectados")
-        if erros:
-            for e in erros:
-                st.write("- " + e)
-        else:
-            st.write("Nenhum erro detectado!")
+def avaliar_redacao(texto, tema):
+    feedback = {}
+    
+    # Linhas
+    linhas = contar_linhas(texto)
+    if linhas < 25:
+        estrutura = 5
+        feedback['Estrutura'] = f"Redação muito curta ({linhas} linhas)."
+    elif linhas > 30:
+        estrutura = 6
+        feedback['Estrutura'] = f"Redação muito longa ({linhas} linhas)."
     else:
-        st.warning("Por favor, cole uma redação para corrigir.")
+        estrutura = 8
+        feedback['Estrutura'] = f"Redação dentro do tamanho adequado ({linhas} linhas)."
+    
+    # Tema
+    if tema.lower() in texto.lower():
+        conteudo = 8
+        tema_cumprido = "Sim"
+        feedback['Conteúdo'] = "Texto adequado ao tema."
+    else:
+        conteudo = 4
+        tema_cumprido = "Não"
+        feedback['Conteúdo'] = "O texto não está totalmente relacionado ao tema."
+    
+    # Linguagem
+    blob = TextBlob(texto)
+    erros_ort = len(blob.correct().split()) - len(texto.split())
+    if erros_ort <= 2:
+        linguagem = 7
+        feedback['Linguagem'] = "Poucos erros gramaticais."
+    elif erros_ort <= 5:
+        linguagem = 5
+        feedback['Linguagem'] = f"Alguns erros gramaticais ({erros_ort} erros)."
+    else:
+        linguagem = 3
+        feedback['Linguagem'] = f"Muitos erros gramaticais ({erros_ort} erros)."
+    
+    # Argumentação/Coesão
+    sentencas = blob.sentences
+    media_palavras = sum(len(s.words) for s in sentencas)/len(sentencas) if len(sentencas)>0 else 0
+    if media_palavras > 10:
+        argumentacao = 7
+        feedback['Argumentação'] = "Boa argumentação e coesão."
+    else:
+        argumentacao = 4
+        feedback['Argumentação'] = "Fraca argumentação; frases muito curtas."
+    
+    # Nota final
+    nota_final = conteudo + estrutura + linguagem + argumentacao
+    palavras_chave = extrair_palavras_chave(texto)
+    
+    return {
+        "nota": round(nota_final,1),
+        "feedback": feedback,
+        "palavras_chave": palavras_chave,
+        "linhas": linhas,
+        "tema_cumprido": tema_cumprido
+    }
+
+# Botão de correção
+if st.button("Corrigir Redação"):
+    if not texto.strip() or not tema.strip():
+        st.warning("Preencha o tema e a redação.")
+    else:
+        resultado = avaliar_redacao(texto, tema)
+        st.subheader(f"Nota final: {resultado['nota']}/30")
+        st.subheader("Feedback detalhado:")
+        for crit, msg in resultado['feedback'].items():
+            st.write(f"**{crit}**: {msg}")
+        st.subheader("Palavras-chave detectadas:")
+        st.write(", ".join(resultado['palavras_chave']))
+        st.write(f"Número de linhas: {resultado['linhas']}")
+        st.write(f"Tema cumprido: {resultado['tema_cumprido']}")
