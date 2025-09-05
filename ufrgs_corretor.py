@@ -1,6 +1,3 @@
-import nltk
-nltk.download('punkt')  # Garante que o tokenizer de frases está disponível
-
 from textblob import TextBlob
 from spellchecker import SpellChecker
 
@@ -41,7 +38,7 @@ def detectar_erros(texto):
     spell = SpellChecker(language='pt')
     palavras = texto.split()
     for palavra in palavras:
-        p = palavra.strip('.,;:!?()[]{}\"')
+        p = palavra.strip('.,;:!?()[]{}"')
         if p and p.lower() not in spell:
             erros.append(f"Possível erro de ortografia: '{palavra}'")
 
